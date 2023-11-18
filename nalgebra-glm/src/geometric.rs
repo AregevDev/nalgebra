@@ -1,3 +1,4 @@
+use num_traits::Signed;
 use crate::RealNumber;
 
 use crate::aliases::{TVec, TVec3};
@@ -23,7 +24,7 @@ pub fn dot<T: Number, const D: usize>(x: &TVec<T, D>, y: &TVec<T, D>) -> T {
 }
 
 /// If `dot(nref, i) < 0.0`, return `n`, otherwise, return `-n`.
-pub fn faceforward<T: Number, const D: usize>(
+pub fn faceforward<T: Number + Signed, const D: usize>(
     n: &TVec<T, D>,
     i: &TVec<T, D>,
     nref: &TVec<T, D>,

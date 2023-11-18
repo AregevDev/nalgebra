@@ -1,5 +1,5 @@
 use approx::AbsDiffEq;
-use num::{Bounded, Signed};
+use num::{Bounded, Num};
 
 use core::cmp::PartialOrd;
 use na::Scalar;
@@ -14,7 +14,7 @@ pub trait Number:
     + ClosedSub
     + ClosedMul
     + AbsDiffEq<Epsilon = Self>
-    + Signed
+    + Num
     + Bounded
 {
 }
@@ -27,7 +27,7 @@ impl<
             + ClosedSub
             + ClosedMul
             + AbsDiffEq<Epsilon = Self>
-            + Signed
+            + Num
             + Bounded,
     > Number for T
 {

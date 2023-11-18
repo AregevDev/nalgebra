@@ -16,7 +16,7 @@ use crate::ClosedAdd;
 /// The type of the result of a matrix component-wise operation.
 pub type MatrixComponentOp<T, R1, C1, R2, C2> = MatrixSum<T, R1, C1, R2, C2>;
 
-impl<T: Scalar, R: Dim, C: Dim, S: Storage<T, R, C>> Matrix<T, R, C, S> {
+impl<T: Scalar + Signed, R: Dim, C: Dim, S: Storage<T, R, C>> Matrix<T, R, C, S> {
     /// Computes the component-wise absolute value.
     ///
     /// # Example

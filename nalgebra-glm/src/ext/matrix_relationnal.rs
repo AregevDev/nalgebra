@@ -1,5 +1,6 @@
 use crate::aliases::{TMat, TVec};
 use crate::traits::Number;
+use num_traits::Signed;
 
 /// Perform a component-wise equal-to comparison of two matrices.
 ///
@@ -20,7 +21,7 @@ pub fn equal_columns<T: Number, const R: usize, const C: usize>(
 /// Returns the component-wise comparison of `|x - y| < epsilon`.
 ///
 /// True if this expression is satisfied.
-pub fn equal_columns_eps<T: Number, const R: usize, const C: usize>(
+pub fn equal_columns_eps<T: Number + Signed, const R: usize, const C: usize>(
     x: &TMat<T, R, C>,
     y: &TMat<T, R, C>,
     epsilon: T,
@@ -31,7 +32,7 @@ pub fn equal_columns_eps<T: Number, const R: usize, const C: usize>(
 /// Returns the component-wise comparison on each matrix column `|x - y| < epsilon`.
 ///
 /// True if this expression is satisfied.
-pub fn equal_columns_eps_vec<T: Number, const R: usize, const C: usize>(
+pub fn equal_columns_eps_vec<T: Number + Signed, const R: usize, const C: usize>(
     x: &TMat<T, R, C>,
     y: &TMat<T, R, C>,
     epsilon: &TVec<T, C>,
@@ -64,7 +65,7 @@ pub fn not_equal_columns<T: Number, const R: usize, const C: usize>(
 /// Returns the component-wise comparison of `|x - y| < epsilon`.
 ///
 /// True if this expression is not satisfied.
-pub fn not_equal_columns_eps<T: Number, const R: usize, const C: usize>(
+pub fn not_equal_columns_eps<T: Number + num::Signed, const R: usize, const C: usize>(
     x: &TMat<T, R, C>,
     y: &TMat<T, R, C>,
     epsilon: T,
@@ -75,7 +76,7 @@ pub fn not_equal_columns_eps<T: Number, const R: usize, const C: usize>(
 /// Returns the component-wise comparison of `|x - y| >= epsilon`.
 ///
 /// True if this expression is not satisfied.
-pub fn not_equal_columns_eps_vec<T: Number, const R: usize, const C: usize>(
+pub fn not_equal_columns_eps_vec<T: Number + Signed, const R: usize, const C: usize>(
     x: &TMat<T, R, C>,
     y: &TMat<T, R, C>,
     epsilon: &TVec<T, C>,

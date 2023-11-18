@@ -1,4 +1,5 @@
 use core::mem;
+use num_traits::Signed;
 
 use crate::aliases::{TMat, TVec};
 use crate::traits::Number;
@@ -20,7 +21,7 @@ use crate::RealNumber;
 /// # See also:
 ///
 /// * [`sign()`]
-pub fn abs<T: Number, const R: usize, const C: usize>(x: &TMat<T, R, C>) -> TMat<T, R, C> {
+pub fn abs<T: Number + Signed, const R: usize, const C: usize>(x: &TMat<T, R, C>) -> TMat<T, R, C> {
     x.abs()
 }
 
@@ -498,7 +499,7 @@ pub fn round<T: RealNumber, const D: usize>(x: &TVec<T, D>) -> TVec<T, D> {
 ///
 /// * [`abs()`]
 ///
-pub fn sign<T: Number, const D: usize>(x: &TVec<T, D>) -> TVec<T, D> {
+pub fn sign<T: Number + Signed, const D: usize>(x: &TVec<T, D>) -> TVec<T, D> {
     x.map(|x| if x.is_zero() { T::zero() } else { x.signum() })
 }
 
