@@ -34,6 +34,17 @@ pub fn reflection_axis_mut<T: ComplexField, D: Dim, S: StorageMut<T, D>>(
 
     if !factor.is_zero() {
         column.unscale_mut(factor.sqrt());
+
+        // Normalize again, making sure the vector is unit-sized.
+        // If `factor` had a very small value, the first normalization
+        // (dividing by `factor.sqrt()`) might end up with a slightly
+        // non-unit vector (especially when using 32-bits float).
+        // Decompositions strongly rely on that unit-vector property,
+        // so we run a second normalization (that is much more numerically
+        // stable since the norm is close to 1) to ensure it has a unit
+        // size.
+        let _ = column.normalize_mut();
+
         (-signed_norm, true)
     } else {
         // TODO: not sure why we don't have a - sign here.
@@ -54,7 +65,7 @@ pub fn clear_column_unchecked<T: ComplexField, R: Dim, C: Dim>(
     bilateral: Option<&mut OVector<T, R>>,
 ) -> T
 where
-    DefaultAllocator: Allocator<T, R, C> + Allocator<T, R>,
+    DefaultAllocator: Allocator<R, C> + Allocator<R>,
 {
     let (mut left, mut right) = matrix.columns_range_pair_mut(icol, icol + 1..);
     let mut axis = left.rows_range_mut(icol + shift..);
@@ -87,7 +98,7 @@ pub fn clear_row_unchecked<T: ComplexField, R: Dim, C: Dim>(
     shift: usize,
 ) -> T
 where
-    DefaultAllocator: Allocator<T, R, C> + Allocator<T, R> + Allocator<T, C>,
+    DefaultAllocator: Allocator<R, C> + Allocator<R> + Allocator<C>,
 {
     let (mut top, mut bottom) = matrix.rows_range_pair_mut(irow, irow + 1..);
     let mut axis = axis_packed.rows_range_mut(irow + shift..);
@@ -118,7 +129,7 @@ where
 #[doc(hidden)]
 pub fn assemble_q<T: ComplexField, D: Dim>(m: &OMatrix<T, D, D>, signs: &[T]) -> OMatrix<T, D, D>
 where
-    DefaultAllocator: Allocator<T, D, D>,
+    DefaultAllocator: Allocator<D, D>,
 {
     assert!(m.is_square());
     let dim = m.shape_generic().0;

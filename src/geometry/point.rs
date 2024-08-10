@@ -15,7 +15,7 @@ use crate::base::allocator::Allocator;
 use crate::base::dimension::{DimName, DimNameAdd, DimNameSum, U1};
 use crate::base::iter::{MatrixIter, MatrixIterMut};
 use crate::base::{Const, DefaultAllocator, OVector, Scalar};
-use simba::scalar::{ClosedAdd, ClosedMul, ClosedSub};
+use simba::scalar::{ClosedAddAssign, ClosedMulAssign, ClosedSubAssign};
 use std::mem::MaybeUninit;
 
 /// A point in an euclidean space.
@@ -49,13 +49,13 @@ use std::mem::MaybeUninit;
         T: rkyv::Archive,
         T::Archived: Scalar,
         OVector<T, D>: rkyv::Archive<Archived = OVector<T::Archived, D>>,
-        DefaultAllocator: Allocator<T::Archived, D>,
+        DefaultAllocator: Allocator<D>,
     ")
     )
 )]
 pub struct OPoint<T: Scalar, D: DimName>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// The coordinates of this point, i.e., the shift from the origin.
     pub coords: OVector<T, D>,
@@ -63,7 +63,7 @@ where
 
 impl<T: Scalar + fmt::Debug, D: DimName> fmt::Debug for OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         self.coords.as_slice().fmt(formatter)
@@ -72,7 +72,7 @@ where
 
 impl<T: Scalar + hash::Hash, D: DimName> hash::Hash for OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.coords.hash(state)
@@ -81,16 +81,8 @@ where
 
 impl<T: Scalar + Copy, D: DimName> Copy for OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
     OVector<T, D>: Copy,
-{
-}
-
-#[cfg(feature = "cuda")]
-unsafe impl<T: Scalar + cust_core::DeviceCopy, D: DimName> cust_core::DeviceCopy for OPoint<T, D>
-where
-    DefaultAllocator: Allocator<T, D>,
-    OVector<T, D>: cust_core::DeviceCopy,
 {
 }
 
@@ -98,7 +90,7 @@ where
 unsafe impl<T: Scalar, D: DimName> bytemuck::Zeroable for OPoint<T, D>
 where
     OVector<T, D>: bytemuck::Zeroable,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
 }
 
@@ -107,15 +99,15 @@ unsafe impl<T: Scalar, D: DimName> bytemuck::Pod for OPoint<T, D>
 where
     T: Copy,
     OVector<T, D>: bytemuck::Pod,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
 }
 
 #[cfg(feature = "serde-serialize-no-std")]
 impl<T: Scalar, D: DimName> Serialize for OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
-    <DefaultAllocator as Allocator<T, D>>::Buffer: Serialize,
+    DefaultAllocator: Allocator<D>,
+    <DefaultAllocator as Allocator<D>>::Buffer<T>: Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -128,8 +120,8 @@ where
 #[cfg(feature = "serde-serialize-no-std")]
 impl<'a, T: Scalar, D: DimName> Deserialize<'a> for OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
-    <DefaultAllocator as Allocator<T, D>>::Buffer: Deserialize<'a>,
+    DefaultAllocator: Allocator<D>,
+    <DefaultAllocator as Allocator<D>>::Buffer<T>: Deserialize<'a>,
 {
     fn deserialize<Des>(deserializer: Des) -> Result<Self, Des::Error>
     where
@@ -143,7 +135,7 @@ where
 
 impl<T: Scalar, D: DimName> OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// Returns a point containing the result of `f` applied to each of its entries.
     ///
@@ -161,7 +153,7 @@ where
     #[must_use]
     pub fn map<T2: Scalar, F: FnMut(T) -> T2>(&self, f: F) -> OPoint<T2, D>
     where
-        DefaultAllocator: Allocator<T2, D>,
+        DefaultAllocator: Allocator<D>,
     {
         self.coords.map(f).into()
     }
@@ -206,7 +198,7 @@ where
     where
         T: One,
         D: DimNameAdd<U1>,
-        DefaultAllocator: Allocator<T, DimNameSum<D, U1>>,
+        DefaultAllocator: Allocator<DimNameSum<D, U1>>,
     {
         // TODO: this is mostly a copy-past from Vector::push.
         //       But we can’t use Vector::push because of the DimAdd bound
@@ -242,7 +234,7 @@ where
     #[must_use]
     pub fn lerp(&self, rhs: &OPoint<T, D>, t: T) -> OPoint<T, D>
     where
-        T: Scalar + Zero + One + ClosedAdd + ClosedSub + ClosedMul,
+        T: Scalar + Zero + One + ClosedAddAssign + ClosedSubAssign + ClosedMulAssign,
     {
         OPoint {
             coords: self.coords.lerp(&rhs.coords, t),
@@ -312,11 +304,15 @@ where
     #[inline]
     pub fn iter(
         &self,
-    ) -> MatrixIter<'_, T, D, Const<1>, <DefaultAllocator as Allocator<T, D>>::Buffer> {
+    ) -> MatrixIter<'_, T, D, Const<1>, <DefaultAllocator as Allocator<D>>::Buffer<T>> {
         self.coords.iter()
     }
 
     /// Gets a reference to i-th element of this point without bound-checking.
+    ///
+    /// # Safety
+    ///
+    /// `i` must be less than `self.len()`.
     #[inline]
     #[must_use]
     pub unsafe fn get_unchecked(&self, i: usize) -> &T {
@@ -339,11 +335,15 @@ where
     #[inline]
     pub fn iter_mut(
         &mut self,
-    ) -> MatrixIterMut<'_, T, D, Const<1>, <DefaultAllocator as Allocator<T, D>>::Buffer> {
+    ) -> MatrixIterMut<'_, T, D, Const<1>, <DefaultAllocator as Allocator<D>>::Buffer<T>> {
         self.coords.iter_mut()
     }
 
     /// Gets a mutable reference to i-th element of this point without bound-checking.
+    ///
+    /// # Safety
+    ///
+    /// `i` must be less than `self.len()`.
     #[inline]
     #[must_use]
     pub unsafe fn get_unchecked_mut(&mut self, i: usize) -> &mut T {
@@ -351,6 +351,10 @@ where
     }
 
     /// Swaps two entries without bound-checking.
+    ///
+    /// # Safety
+    ///
+    /// `i1` and `i2` must be less than `self.len()`.
     #[inline]
     pub unsafe fn swap_unchecked(&mut self, i1: usize, i2: usize) {
         self.coords.swap_unchecked((i1, 0), (i2, 0))
@@ -360,7 +364,7 @@ where
 impl<T: Scalar + AbsDiffEq, D: DimName> AbsDiffEq for OPoint<T, D>
 where
     T::Epsilon: Clone,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     type Epsilon = T::Epsilon;
 
@@ -378,7 +382,7 @@ where
 impl<T: Scalar + RelativeEq, D: DimName> RelativeEq for OPoint<T, D>
 where
     T::Epsilon: Clone,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     #[inline]
     fn default_max_relative() -> Self::Epsilon {
@@ -400,7 +404,7 @@ where
 impl<T: Scalar + UlpsEq, D: DimName> UlpsEq for OPoint<T, D>
 where
     T::Epsilon: Clone,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     #[inline]
     fn default_max_ulps() -> u32 {
@@ -413,11 +417,11 @@ where
     }
 }
 
-impl<T: Scalar + Eq, D: DimName> Eq for OPoint<T, D> where DefaultAllocator: Allocator<T, D> {}
+impl<T: Scalar + Eq, D: DimName> Eq for OPoint<T, D> where DefaultAllocator: Allocator<D> {}
 
 impl<T: Scalar, D: DimName> PartialEq for OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     #[inline]
     fn eq(&self, right: &Self) -> bool {
@@ -427,7 +431,7 @@ where
 
 impl<T: Scalar + PartialOrd, D: DimName> PartialOrd for OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -460,7 +464,7 @@ where
  */
 impl<T: Scalar + SimdPartialOrd, D: DimName> OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// Computes the infimum (aka. componentwise min) of two points.
     #[inline]
@@ -492,17 +496,18 @@ where
  */
 impl<T: Scalar + fmt::Display, D: DimName> fmt::Display for OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{{")?;
 
         let mut it = self.coords.iter();
 
-        write!(f, "{}", *it.next().unwrap())?;
+        <T as fmt::Display>::fmt(it.next().unwrap(), f)?;
 
         for comp in it {
-            write!(f, ", {}", *comp)?;
+            write!(f, ", ")?;
+            <T as fmt::Display>::fmt(comp, f)?;
         }
 
         write!(f, "}}")

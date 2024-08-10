@@ -15,13 +15,13 @@ use crate::{
     Const, DimName, OPoint, OVector, Point1, Point2, Point3, Point4, Point5, Point6, Vector1,
     Vector2, Vector3, Vector4, Vector5, Vector6,
 };
-use simba::scalar::{ClosedDiv, SupersetOf};
+use simba::scalar::{ClosedDivAssign, SupersetOf};
 
 use crate::geometry::Point;
 
 impl<T: Scalar + Zero, D: DimName> Default for OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     fn default() -> Self {
         Self::origin()
@@ -31,7 +31,7 @@ where
 /// # Other construction methods
 impl<T: Scalar, D: DimName> OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// Creates a new point with all coordinates equal to zero.
     ///
@@ -108,9 +108,9 @@ where
     #[inline]
     pub fn from_homogeneous(v: OVector<T, DimNameSum<D, U1>>) -> Option<Self>
     where
-        T: Scalar + Zero + One + ClosedDiv,
+        T: Scalar + Zero + One + ClosedDivAssign,
         D: DimNameAdd<U1>,
-        DefaultAllocator: Allocator<T, DimNameSum<D, U1>>,
+        DefaultAllocator: Allocator<DimNameSum<D, U1>>,
     {
         if !v[D::dim()].is_zero() {
             let coords = v.generic_view((0, 0), (D::name(), Const::<1>)) / v[D::dim()].clone();
@@ -132,7 +132,7 @@ where
     pub fn cast<To: Scalar>(self) -> OPoint<To, D>
     where
         OPoint<To, D>: SupersetOf<Self>,
-        DefaultAllocator: Allocator<To, D>,
+        DefaultAllocator: Allocator<D>,
     {
         crate::convert(self)
     }
@@ -145,7 +145,7 @@ where
  */
 impl<T: Scalar + Bounded, D: DimName> Bounded for OPoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     #[inline]
     fn max_value() -> Self {
@@ -162,7 +162,7 @@ where
 impl<T: Scalar, D: DimName> Distribution<OPoint<T, D>> for Standard
 where
     Standard: Distribution<T>,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// Generate a `Point` where each coordinate is an independent variate from `[0, 1)`.
     #[inline]
@@ -174,8 +174,8 @@ where
 #[cfg(feature = "arbitrary")]
 impl<T: Scalar + Arbitrary + Send, D: DimName> Arbitrary for OPoint<T, D>
 where
-    <DefaultAllocator as Allocator<T, D>>::Buffer: Send,
-    DefaultAllocator: Allocator<T, D>,
+    <DefaultAllocator as Allocator<D>>::Buffer<T>: Send,
+    DefaultAllocator: Allocator<D>,
 {
     #[inline]
     fn arbitrary(g: &mut Gen) -> Self {
@@ -202,25 +202,7 @@ impl<T: Scalar> Point1<T> {
     /// assert_eq!(p.x, 1.0);
     /// ```
     #[inline]
-    #[cfg(not(feature = "cuda"))]
     pub const fn new(x: T) -> Self {
-        Point {
-            coords: Vector1::new(x),
-        }
-    }
-
-    /// Initializes this point from its components.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use nalgebra::Point1;
-    /// let p = Point1::new(1.0);
-    /// assert_eq!(p.x, 1.0);
-    /// ```
-    #[inline]
-    #[cfg(feature = "cuda")]
-    pub fn new(x: T) -> Self {
         Point {
             coords: Vector1::new(x),
         }
@@ -234,20 +216,7 @@ macro_rules! componentwise_constructors_impl(
             #[doc = $doc]
             #[doc = "```"]
             #[inline]
-            #[cfg(not(feature = "cuda"))]
             pub const fn new($($args: T),*) -> Self {
-                Point { coords: $Vector::new($($args),*) }
-            }
-
-            // TODO: always let new be const once CUDA updates its supported
-            //       nightly version to something more recent.
-            #[doc = "Initializes this point from its components."]
-            #[doc = "# Example\n```"]
-            #[doc = $doc]
-            #[doc = "```"]
-            #[inline]
-            #[cfg(feature = "cuda")]
-            pub fn new($($args: T),*) -> Self {
                 Point { coords: $Vector::new($($args),*) }
             }
         }

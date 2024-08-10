@@ -1,4 +1,4 @@
-use na::DMatrix;
+use na::{DMatrix, Matrix3};
 
 #[cfg(feature = "proptest-support")]
 mod proptest_tests {
@@ -116,6 +116,31 @@ fn symmetric_eigen_singular_24x24() {
     );
 }
 
+// Regression test for #1368
+#[test]
+fn very_small_deviation_from_identity_issue_1368() {
+    let m = Matrix3::<f32>::new(
+        1.0,
+        3.1575704e-23,
+        8.1146196e-23,
+        3.1575704e-23,
+        1.0,
+        1.7471054e-22,
+        8.1146196e-23,
+        1.7471054e-22,
+        1.0,
+    );
+
+    for v in m
+        .try_symmetric_eigen(f32::EPSILON, 0)
+        .unwrap()
+        .eigenvalues
+        .into_iter()
+    {
+        assert_relative_eq!(*v, 1.);
+    }
+}
+
 //  #[cfg(feature = "arbitrary")]
 //  quickcheck! {
 // TODO: full eigendecomposition is not implemented yet because of its complexity when some
@@ -183,8 +208,8 @@ fn symmetric_eigen_singular_24x24() {
 // fn verify_eigenvectors<D: Dim>(m: OMatrix<f64, D>, mut eig: RealEigen<f64, D>) -> bool
 //     where DefaultAllocator: Allocator<f64, D, D>   +
 //                             Allocator<f64, D>      +
-//                             Allocator<usize, D, D> +
-//                             Allocator<usize, D>,
+//                             Allocator<D, D> +
+//                             Allocator<D>,
 //           OMatrix<f64, D>: Display,
 //           OVector<f64, D>: Display {
 //     let mv = &m * &eig.eigenvectors;

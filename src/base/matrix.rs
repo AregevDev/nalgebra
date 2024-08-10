@@ -18,7 +18,7 @@ use rkyv::bytecheck;
 #[cfg(feature = "rkyv-serialize-no-std")]
 use rkyv::{with::With, Archive, Archived};
 
-use simba::scalar::{ClosedAdd, ClosedMul, ClosedSub, Field, SupersetOf};
+use simba::scalar::{ClosedAddAssign, ClosedMulAssign, ClosedSubAssign, Field, SupersetOf};
 use simba::simd::SimdPartialOrd;
 
 use crate::base::allocator::{Allocator, SameShapeAllocator, SameShapeC, SameShapeR};
@@ -171,7 +171,6 @@ pub type MatrixCross<T, R1, C1, R2, C2> =
     )
 )]
 #[cfg_attr(feature = "rkyv-serialize", derive(bytecheck::CheckBytes))]
-#[cfg_attr(feature = "cuda", derive(cust_core::DeviceCopy))]
 pub struct Matrix<T, R, C, S> {
     /// The data storage that contains all the matrix components. Disappointed?
     ///
@@ -313,6 +312,10 @@ where
 impl<T, R, C, S> Matrix<T, R, C, S> {
     /// Creates a new matrix with the given data without statically checking that the matrix
     /// dimension matches the storage dimension.
+    ///
+    /// # Safety
+    ///
+    /// The storage dimension must match the given dimensions.
     #[inline(always)]
     pub const unsafe fn from_data_statically_unchecked(data: S) -> Matrix<T, R, C, S> {
         Matrix {
@@ -380,9 +383,9 @@ impl<T> RowDVector<T> {
     }
 }
 
-impl<T, R: Dim, C: Dim> UninitMatrix<T, R, C>
+impl<T: Scalar, R: Dim, C: Dim> UninitMatrix<T, R, C>
 where
-    DefaultAllocator: Allocator<T, R, C>,
+    DefaultAllocator: Allocator<R, C>,
 {
     /// Assumes a matrix's entries to be initialized. This operation should be near zero-cost.
     ///
@@ -391,7 +394,7 @@ where
     /// or Undefined Behavior will immediately occur.
     #[inline(always)]
     pub unsafe fn assume_init(self) -> OMatrix<T, R, C> {
-        OMatrix::from_data(<DefaultAllocator as Allocator<T, R, C>>::assume_init(
+        OMatrix::from_data(<DefaultAllocator as Allocator<R, C>>::assume_init(
             self.data,
         ))
     }
@@ -530,7 +533,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
         max_relative: T::Epsilon,
     ) -> bool
     where
-        T: RelativeEq,
+        T: RelativeEq + Scalar,
         R2: Dim,
         C2: Dim,
         SB: Storage<T, R2, C2>,
@@ -565,7 +568,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
     where
         T: Scalar,
         S: Storage<T, R, C>,
-        DefaultAllocator: Allocator<T, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         Matrix::from_data(self.data.into_owned())
     }
@@ -581,7 +584,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
         S: Storage<T, R, C>,
         R2: Dim,
         C2: Dim,
-        DefaultAllocator: SameShapeAllocator<T, R, C, R2, C2>,
+        DefaultAllocator: SameShapeAllocator<R, C, R2, C2>,
         ShapeConstraint: SameNumberOfRows<R, R2> + SameNumberOfColumns<C, C2>,
     {
         if TypeId::of::<SameShapeStorage<T, R, C, R2, C2>>() == TypeId::of::<Owned<T, R, C>>() {
@@ -606,7 +609,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
     where
         T: Scalar,
         S: Storage<T, R, C>,
-        DefaultAllocator: Allocator<T, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         Matrix::from_data(self.data.clone_owned())
     }
@@ -621,7 +624,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
         S: Storage<T, R, C>,
         R2: Dim,
         C2: Dim,
-        DefaultAllocator: SameShapeAllocator<T, R, C, R2, C2>,
+        DefaultAllocator: SameShapeAllocator<R, C, R2, C2>,
         ShapeConstraint: SameNumberOfRows<R, R2> + SameNumberOfColumns<C, C2>,
     {
         let (nrows, ncols) = self.shape();
@@ -697,7 +700,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
     pub fn transpose(&self) -> OMatrix<T, C, R>
     where
         T: Scalar,
-        DefaultAllocator: Allocator<T, C, R>,
+        DefaultAllocator: Allocator<C, R>,
     {
         let (nrows, ncols) = self.shape_generic();
 
@@ -716,7 +719,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
     pub fn map<T2: Scalar, F: FnMut(T) -> T2>(&self, mut f: F) -> OMatrix<T2, R, C>
     where
         T: Scalar,
-        DefaultAllocator: Allocator<T2, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         let (nrows, ncols) = self.shape_generic();
         let mut res = Matrix::uninit(nrows, ncols);
@@ -748,7 +751,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
     where
         T: Scalar,
         OMatrix<T2, R, C>: SupersetOf<Self>,
-        DefaultAllocator: Allocator<T2, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         crate::convert(self)
     }
@@ -766,7 +769,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
     where
         T: Scalar,
         Self: SupersetOf<OMatrix<T2, R, C>>,
-        DefaultAllocator: Allocator<T2, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         crate::try_convert(self)
     }
@@ -803,7 +806,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
     ) -> OMatrix<T2, R, C>
     where
         T: Scalar,
-        DefaultAllocator: Allocator<T2, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         let (nrows, ncols) = self.shape_generic();
         let mut res = Matrix::uninit(nrows, ncols);
@@ -833,7 +836,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
         N3: Scalar,
         S2: RawStorage<T2, R, C>,
         F: FnMut(T, T2) -> N3,
-        DefaultAllocator: Allocator<N3, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         let (nrows, ncols) = self.shape_generic();
         let mut res = Matrix::uninit(nrows, ncols);
@@ -877,7 +880,7 @@ impl<T, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C, S> {
         S2: RawStorage<T2, R, C>,
         S3: RawStorage<N3, R, C>,
         F: FnMut(T, T2, N3) -> N4,
-        DefaultAllocator: Allocator<N4, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         let (nrows, ncols) = self.shape_generic();
         let mut res = Matrix::uninit(nrows, ncols);
@@ -1194,6 +1197,10 @@ impl<T, R: Dim, C: Dim, S: RawStorageMut<T, R, C>> Matrix<T, R, C, S> {
     }
 
     /// Swaps two entries without bound-checking.
+    ///
+    /// # Safety
+    ///
+    /// Both `(r, c)` must have `r < nrows(), c < ncols()`.
     #[inline]
     pub unsafe fn swap_unchecked(&mut self, row_cols1: (usize, usize), row_cols2: (usize, usize)) {
         debug_assert!(row_cols1.0 < self.nrows() && row_cols1.1 < self.ncols());
@@ -1300,6 +1307,8 @@ impl<T, R: Dim, C: Dim, S: RawStorageMut<T, R, C>> Matrix<T, R, C, S> {
 
 impl<T, D: Dim, S: RawStorage<T, D>> Vector<T, D, S> {
     /// Gets a reference to the i-th element of this column vector without bound checking.
+    /// # Safety
+    /// `i` must be less than `D`.
     #[inline]
     #[must_use]
     pub unsafe fn vget_unchecked(&self, i: usize) -> &T {
@@ -1311,6 +1320,8 @@ impl<T, D: Dim, S: RawStorage<T, D>> Vector<T, D, S> {
 
 impl<T, D: Dim, S: RawStorageMut<T, D>> Vector<T, D, S> {
     /// Gets a mutable reference to the i-th element of this column vector without bound checking.
+    /// # Safety
+    /// `i` must be less than `D`.
     #[inline]
     #[must_use]
     pub unsafe fn vget_unchecked_mut(&mut self, i: usize) -> &mut T {
@@ -1409,7 +1420,7 @@ impl<T: SimdComplexField, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C
     #[must_use = "Did you mean to use adjoint_mut()?"]
     pub fn adjoint(&self) -> OMatrix<T, C, R>
     where
-        DefaultAllocator: Allocator<T, C, R>,
+        DefaultAllocator: Allocator<C, R>,
     {
         let (nrows, ncols) = self.shape_generic();
 
@@ -1438,7 +1449,7 @@ impl<T: SimdComplexField, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C
     #[inline]
     pub fn conjugate_transpose(&self) -> OMatrix<T, C, R>
     where
-        DefaultAllocator: Allocator<T, C, R>,
+        DefaultAllocator: Allocator<C, R>,
     {
         self.adjoint()
     }
@@ -1448,7 +1459,7 @@ impl<T: SimdComplexField, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C
     #[must_use = "Did you mean to use conjugate_mut()?"]
     pub fn conjugate(&self) -> OMatrix<T, R, C>
     where
-        DefaultAllocator: Allocator<T, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         self.map(|e| e.simd_conjugate())
     }
@@ -1458,7 +1469,7 @@ impl<T: SimdComplexField, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C
     #[must_use = "Did you mean to use unscale_mut()?"]
     pub fn unscale(&self, real: T::SimdRealField) -> OMatrix<T, R, C>
     where
-        DefaultAllocator: Allocator<T, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         self.map(|e| e.simd_unscale(real.clone()))
     }
@@ -1468,7 +1479,7 @@ impl<T: SimdComplexField, R: Dim, C: Dim, S: RawStorage<T, R, C>> Matrix<T, R, C
     #[must_use = "Did you mean to use scale_mut()?"]
     pub fn scale(&self, real: T::SimdRealField) -> OMatrix<T, R, C>
     where
-        DefaultAllocator: Allocator<T, R, C>,
+        DefaultAllocator: Allocator<R, C>,
     {
         self.map(|e| e.simd_scale(real.clone()))
     }
@@ -1536,7 +1547,7 @@ impl<T: Scalar, D: Dim, S: RawStorage<T, D, D>> SquareMatrix<T, D, S> {
     #[must_use]
     pub fn diagonal(&self) -> OVector<T, D>
     where
-        DefaultAllocator: Allocator<T, D>,
+        DefaultAllocator: Allocator<D>,
     {
         self.map_diagonal(|e| e)
     }
@@ -1548,7 +1559,7 @@ impl<T: Scalar, D: Dim, S: RawStorage<T, D, D>> SquareMatrix<T, D, S> {
     #[must_use]
     pub fn map_diagonal<T2: Scalar>(&self, mut f: impl FnMut(T) -> T2) -> OVector<T2, D>
     where
-        DefaultAllocator: Allocator<T2, D>,
+        DefaultAllocator: Allocator<D>,
     {
         assert!(
             self.is_square(),
@@ -1575,7 +1586,7 @@ impl<T: Scalar, D: Dim, S: RawStorage<T, D, D>> SquareMatrix<T, D, S> {
     #[must_use]
     pub fn trace(&self) -> T
     where
-        T: Scalar + Zero + ClosedAdd,
+        T: Scalar + Zero + ClosedAddAssign,
     {
         assert!(
             self.is_square(),
@@ -1599,7 +1610,7 @@ impl<T: SimdComplexField, D: Dim, S: Storage<T, D, D>> SquareMatrix<T, D, S> {
     #[must_use]
     pub fn symmetric_part(&self) -> OMatrix<T, D, D>
     where
-        DefaultAllocator: Allocator<T, D, D>,
+        DefaultAllocator: Allocator<D, D>,
     {
         assert!(
             self.is_square(),
@@ -1616,7 +1627,7 @@ impl<T: SimdComplexField, D: Dim, S: Storage<T, D, D>> SquareMatrix<T, D, S> {
     #[must_use]
     pub fn hermitian_part(&self) -> OMatrix<T, D, D>
     where
-        DefaultAllocator: Allocator<T, D, D>,
+        DefaultAllocator: Allocator<D, D>,
     {
         assert!(
             self.is_square(),
@@ -1639,7 +1650,7 @@ impl<T: Scalar + Zero + One, D: DimAdd<U1> + IsNotStaticOne, S: RawStorage<T, D,
     #[must_use]
     pub fn to_homogeneous(&self) -> OMatrix<T, DimSum<D, U1>, DimSum<D, U1>>
     where
-        DefaultAllocator: Allocator<T, DimSum<D, U1>, DimSum<D, U1>>,
+        DefaultAllocator: Allocator<DimSum<D, U1>, DimSum<D, U1>>,
     {
         assert!(
             self.is_square(),
@@ -1660,7 +1671,7 @@ impl<T: Scalar + Zero, D: DimAdd<U1>, S: RawStorage<T, D>> Vector<T, D, S> {
     #[must_use]
     pub fn to_homogeneous(&self) -> OVector<T, DimSum<D, U1>>
     where
-        DefaultAllocator: Allocator<T, DimSum<D, U1>>,
+        DefaultAllocator: Allocator<DimSum<D, U1>>,
     {
         self.push(T::zero())
     }
@@ -1671,7 +1682,7 @@ impl<T: Scalar + Zero, D: DimAdd<U1>, S: RawStorage<T, D>> Vector<T, D, S> {
     pub fn from_homogeneous<SB>(v: Vector<T, DimSum<D, U1>, SB>) -> Option<OVector<T, D>>
     where
         SB: RawStorage<T, DimSum<D, U1>>,
-        DefaultAllocator: Allocator<T, D>,
+        DefaultAllocator: Allocator<D>,
     {
         if v[v.len() - 1].is_zero() {
             let nrows = D::from_usize(v.len() - 1);
@@ -1688,7 +1699,7 @@ impl<T: Scalar, D: DimAdd<U1>, S: RawStorage<T, D>> Vector<T, D, S> {
     #[must_use]
     pub fn push(&self, element: T) -> OVector<T, DimSum<D, U1>>
     where
-        DefaultAllocator: Allocator<T, DimSum<D, U1>>,
+        DefaultAllocator: Allocator<DimSum<D, U1>>,
     {
         let len = self.len();
         let hnrows = DimSum::<D, U1>::from_usize(len + 1);
@@ -1991,8 +2002,12 @@ mod tests {
 }
 
 /// # Cross product
-impl<T: Scalar + ClosedAdd + ClosedSub + ClosedMul, R: Dim, C: Dim, S: RawStorage<T, R, C>>
-    Matrix<T, R, C, S>
+impl<
+        T: Scalar + ClosedAddAssign + ClosedSubAssign + ClosedMulAssign,
+        R: Dim,
+        C: Dim,
+        S: RawStorage<T, R, C>,
+    > Matrix<T, R, C, S>
 {
     /// The perpendicular product between two 2D column vectors, i.e. `a.x * b.y - a.y * b.x`.
     #[inline]
@@ -2041,7 +2056,7 @@ impl<T: Scalar + ClosedAdd + ClosedSub + ClosedMul, R: Dim, C: Dim, S: RawStorag
         R2: Dim,
         C2: Dim,
         SB: RawStorage<T, R2, C2>,
-        DefaultAllocator: SameShapeAllocator<T, R, C, R2, C2>,
+        DefaultAllocator: SameShapeAllocator<R, C, R2, C2>,
         ShapeConstraint: SameNumberOfRows<R, R2> + SameNumberOfColumns<C, C2>,
     {
         let shape = self.shape();
@@ -2241,7 +2256,7 @@ where
     where
         T: Scalar,
         OVector<T2, D>: SupersetOf<Vector<T, D, S>>,
-        DefaultAllocator: Allocator<T2, D, U1>,
+        DefaultAllocator: Allocator<D, U1>,
     {
         Unit::new_unchecked(crate::convert_ref(self.as_ref()))
     }

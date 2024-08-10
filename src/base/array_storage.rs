@@ -27,7 +27,7 @@ use std::mem;
  * Static RawStorage.
  *
  */
-/// A array-based statically sized matrix data storage.
+/// An array-based statically sized matrix data storage.
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
@@ -42,7 +42,6 @@ use std::mem;
     )
 )]
 #[cfg_attr(feature = "rkyv-serialize", derive(bytecheck::CheckBytes))]
-#[cfg_attr(feature = "cuda", derive(cust_core::DeviceCopy))]
 pub struct ArrayStorage<T, const R: usize, const C: usize>(pub [[T; R]; C]);
 
 impl<T, const R: usize, const C: usize> ArrayStorage<T, R, C> {
@@ -114,12 +113,12 @@ unsafe impl<T, const R: usize, const C: usize> RawStorage<T, Const<R>, Const<C>>
 unsafe impl<T: Scalar, const R: usize, const C: usize> Storage<T, Const<R>, Const<C>>
     for ArrayStorage<T, R, C>
 where
-    DefaultAllocator: Allocator<T, Const<R>, Const<C>, Buffer = Self>,
+    DefaultAllocator: Allocator<Const<R>, Const<C>, Buffer<T> = Self>,
 {
     #[inline]
     fn into_owned(self) -> Owned<T, Const<R>, Const<C>>
     where
-        DefaultAllocator: Allocator<T, Const<R>, Const<C>>,
+        DefaultAllocator: Allocator<Const<R>, Const<C>>,
     {
         self
     }
@@ -127,9 +126,15 @@ where
     #[inline]
     fn clone_owned(&self) -> Owned<T, Const<R>, Const<C>>
     where
-        DefaultAllocator: Allocator<T, Const<R>, Const<C>>,
+        DefaultAllocator: Allocator<Const<R>, Const<C>>,
     {
         self.clone()
+    }
+
+    #[inline]
+    fn forget_elements(self) {
+        // No additional cleanup required.
+        std::mem::forget(self);
     }
 }
 
@@ -251,7 +256,7 @@ where
         V: SeqAccess<'a>,
     {
         let mut out: ArrayStorage<core::mem::MaybeUninit<T>, R, C> =
-            DefaultAllocator::allocate_uninit(Const::<R>, Const::<C>);
+            <DefaultAllocator as Allocator<_, _>>::allocate_uninit(Const::<R>, Const::<C>);
         let mut curr = 0;
 
         while let Some(value) = visitor.next_element()? {
@@ -264,7 +269,7 @@ where
 
         if curr == R * C {
             // Safety: all the elements have been initialized.
-            unsafe { Ok(<DefaultAllocator as Allocator<T, Const<R>, Const<C>>>::assume_init(out)) }
+            unsafe { Ok(<DefaultAllocator as Allocator<Const<R>, Const<C>>>::assume_init(out)) }
         } else {
             for i in 0..curr {
                 // Safety:

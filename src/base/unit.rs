@@ -35,7 +35,6 @@ use rkyv::bytecheck;
     )
 )]
 #[cfg_attr(feature = "rkyv-serialize", derive(bytecheck::CheckBytes))]
-// #[cfg_attr(feature = "cuda", derive(cust_core::DeviceCopy))]
 pub struct Unit<T> {
     pub(crate) value: T,
 }
@@ -70,16 +69,6 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Unit<T> {
     {
         T::deserialize(deserializer).map(|x| Unit { value: x })
     }
-}
-
-#[cfg(feature = "cuda")]
-unsafe impl<T: cust_core::DeviceCopy, R, C, S> cust_core::DeviceCopy for Unit<Matrix<T, R, C, S>>
-where
-    T: Scalar,
-    R: Dim,
-    C: Dim,
-    S: RawStorage<T, R, C> + Copy,
-{
 }
 
 impl<T, R, C, S> PartialEq for Unit<Matrix<T, R, C, S>>
@@ -314,7 +303,7 @@ impl<T: Scalar + simba::simd::PrimitiveSimdValue, R: Dim, C: Dim>
 where
     T: From<[<T as simba::simd::SimdValue>::Element; 2]>,
     T::Element: Scalar,
-    DefaultAllocator: Allocator<T, R, C> + Allocator<T::Element, R, C>,
+    DefaultAllocator: Allocator<R, C>,
 {
     #[inline]
     fn from(arr: [Unit<OMatrix<T::Element, R, C>>; 2]) -> Self {
@@ -330,7 +319,7 @@ impl<T: Scalar + simba::simd::PrimitiveSimdValue, R: Dim, C: Dim>
 where
     T: From<[<T as simba::simd::SimdValue>::Element; 4]>,
     T::Element: Scalar,
-    DefaultAllocator: Allocator<T, R, C> + Allocator<T::Element, R, C>,
+    DefaultAllocator: Allocator<R, C>,
 {
     #[inline]
     fn from(arr: [Unit<OMatrix<T::Element, R, C>>; 4]) -> Self {
@@ -348,7 +337,7 @@ impl<T: Scalar + simba::simd::PrimitiveSimdValue, R: Dim, C: Dim>
 where
     T: From<[<T as simba::simd::SimdValue>::Element; 8]>,
     T::Element: Scalar,
-    DefaultAllocator: Allocator<T, R, C> + Allocator<T::Element, R, C>,
+    DefaultAllocator: Allocator<R, C>,
 {
     #[inline]
     fn from(arr: [Unit<OMatrix<T::Element, R, C>>; 8]) -> Self {
@@ -370,7 +359,7 @@ impl<T: Scalar + simba::simd::PrimitiveSimdValue, R: Dim, C: Dim>
 where
     T: From<[<T as simba::simd::SimdValue>::Element; 16]>,
     T::Element: Scalar,
-    DefaultAllocator: Allocator<T, R, C> + Allocator<T::Element, R, C>,
+    DefaultAllocator: Allocator<R, C>,
 {
     #[inline]
     fn from(arr: [Unit<OMatrix<T::Element, R, C>>; 16]) -> Self {

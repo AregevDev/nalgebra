@@ -264,12 +264,12 @@ unsafe impl<T, C: Dim> RawStorage<T, Dyn, C> for VecStorage<T, Dyn, C> {
 
 unsafe impl<T: Scalar, C: Dim> Storage<T, Dyn, C> for VecStorage<T, Dyn, C>
 where
-    DefaultAllocator: Allocator<T, Dyn, C, Buffer = Self>,
+    DefaultAllocator: Allocator<Dyn, C, Buffer<T> = Self>,
 {
     #[inline]
     fn into_owned(self) -> Owned<T, Dyn, C>
     where
-        DefaultAllocator: Allocator<T, Dyn, C>,
+        DefaultAllocator: Allocator<Dyn, C>,
     {
         self
     }
@@ -277,9 +277,20 @@ where
     #[inline]
     fn clone_owned(&self) -> Owned<T, Dyn, C>
     where
-        DefaultAllocator: Allocator<T, Dyn, C>,
+        DefaultAllocator: Allocator<Dyn, C>,
     {
         self.clone()
+    }
+
+    #[inline]
+    fn forget_elements(mut self) {
+        // SAFETY: setting the length to zero is always sound, as it does not
+        // cause any memory to be deemed initialized. If the previous length was
+        // non-zero, it is equivalent to using mem::forget to leak each element.
+        // Then, when this function returns, self.data is dropped, freeing the
+        // allocated memory, but the elements are not dropped because they are
+        // now considered uninitialized.
+        unsafe { self.data.set_len(0) };
     }
 }
 
@@ -315,12 +326,12 @@ unsafe impl<T, R: DimName> RawStorage<T, R, Dyn> for VecStorage<T, R, Dyn> {
 
 unsafe impl<T: Scalar, R: DimName> Storage<T, R, Dyn> for VecStorage<T, R, Dyn>
 where
-    DefaultAllocator: Allocator<T, R, Dyn, Buffer = Self>,
+    DefaultAllocator: Allocator<R, Dyn, Buffer<T> = Self>,
 {
     #[inline]
     fn into_owned(self) -> Owned<T, R, Dyn>
     where
-        DefaultAllocator: Allocator<T, R, Dyn>,
+        DefaultAllocator: Allocator<R, Dyn>,
     {
         self
     }
@@ -328,9 +339,20 @@ where
     #[inline]
     fn clone_owned(&self) -> Owned<T, R, Dyn>
     where
-        DefaultAllocator: Allocator<T, R, Dyn>,
+        DefaultAllocator: Allocator<R, Dyn>,
     {
         self.clone()
+    }
+
+    #[inline]
+    fn forget_elements(mut self) {
+        // SAFETY: setting the length to zero is always sound, as it does not
+        // cause any memory to be deemed initialized. If the previous length was
+        // non-zero, it is equivalent to using mem::forget to leak each element.
+        // Then, when this function returns, self.data is dropped, freeing the
+        // allocated memory, but the elements are not dropped because they are
+        // now considered uninitialized.
+        unsafe { self.data.set_len(0) };
     }
 }
 

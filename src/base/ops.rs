@@ -4,7 +4,9 @@ use std::ops::{
     Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Neg, Sub, SubAssign,
 };
 
-use simba::scalar::{ClosedAdd, ClosedDiv, ClosedMul, ClosedNeg, ClosedSub};
+use simba::scalar::{
+    ClosedAddAssign, ClosedDivAssign, ClosedMulAssign, ClosedNeg, ClosedSubAssign,
+};
 
 use crate::base::allocator::{Allocator, SameShapeAllocator, SameShapeC, SameShapeR};
 use crate::base::blas_uninit::gemm_uninit;
@@ -81,7 +83,7 @@ impl<T, R: Dim, C: Dim, S> Neg for Matrix<T, R, C, S>
 where
     T: Scalar + ClosedNeg,
     S: Storage<T, R, C>,
-    DefaultAllocator: Allocator<T, R, C>,
+    DefaultAllocator: Allocator<R, C>,
 {
     type Output = OMatrix<T, R, C>;
 
@@ -97,7 +99,7 @@ impl<'a, T, R: Dim, C: Dim, S> Neg for &'a Matrix<T, R, C, S>
 where
     T: Scalar + ClosedNeg,
     S: Storage<T, R, C>,
-    DefaultAllocator: Allocator<T, R, C>,
+    DefaultAllocator: Allocator<R, C>,
 {
     type Output = OMatrix<T, R, C>;
 
@@ -262,7 +264,7 @@ macro_rules! componentwise_binop_impl(
                   T: Scalar + $bound,
                   SA: Storage<T, R1, C1>,
                   SB: Storage<T, R2, C2>,
-                  DefaultAllocator: SameShapeAllocator<T, R1, C1, R2, C2>,
+                  DefaultAllocator: SameShapeAllocator<R1, C1, R2, C2>,
                   ShapeConstraint:  SameNumberOfRows<R1, R2> + SameNumberOfColumns<C1, C2> {
             type Output = MatrixSum<T, R1, C1, R2, C2>;
 
@@ -280,7 +282,7 @@ macro_rules! componentwise_binop_impl(
                   T: Scalar + $bound,
                   SA: Storage<T, R1, C1>,
                   SB: Storage<T, R2, C2>,
-                  DefaultAllocator: SameShapeAllocator<T, R2, C2, R1, C1>,
+                  DefaultAllocator: SameShapeAllocator<R2, C2, R1, C1>,
                   ShapeConstraint:  SameNumberOfRows<R2, R1> + SameNumberOfColumns<C2, C1> {
             type Output = MatrixSum<T, R2, C2, R1, C1>;
 
@@ -298,7 +300,7 @@ macro_rules! componentwise_binop_impl(
                   T: Scalar + $bound,
                   SA: Storage<T, R1, C1>,
                   SB: Storage<T, R2, C2>,
-                  DefaultAllocator: SameShapeAllocator<T, R1, C1, R2, C2>,
+                  DefaultAllocator: SameShapeAllocator<R1, C1, R2, C2>,
                   ShapeConstraint:  SameNumberOfRows<R1, R2> + SameNumberOfColumns<C1, C2> {
             type Output = MatrixSum<T, R1, C1, R2, C2>;
 
@@ -313,7 +315,7 @@ macro_rules! componentwise_binop_impl(
                   T: Scalar + $bound,
                   SA: Storage<T, R1, C1>,
                   SB: Storage<T, R2, C2>,
-                  DefaultAllocator: SameShapeAllocator<T, R1, C1, R2, C2>,
+                  DefaultAllocator: SameShapeAllocator<R1, C1, R2, C2>,
                   ShapeConstraint:  SameNumberOfRows<R1, R2> + SameNumberOfColumns<C1, C2> {
             type Output = MatrixSum<T, R1, C1, R2, C2>;
 
@@ -357,17 +359,17 @@ macro_rules! componentwise_binop_impl(
     }
 );
 
-componentwise_binop_impl!(Add, add, ClosedAdd;
+componentwise_binop_impl!(Add, add, ClosedAddAssign;
                           AddAssign, add_assign, add_assign_statically_unchecked, add_assign_statically_unchecked_mut;
                           add_to, add_to_statically_unchecked_uninit);
-componentwise_binop_impl!(Sub, sub, ClosedSub;
+componentwise_binop_impl!(Sub, sub, ClosedSubAssign;
                           SubAssign, sub_assign, sub_assign_statically_unchecked, sub_assign_statically_unchecked_mut;
                           sub_to, sub_to_statically_unchecked_uninit);
 
 impl<T, R: DimName, C: DimName> iter::Sum for OMatrix<T, R, C>
 where
-    T: Scalar + ClosedAdd + Zero,
-    DefaultAllocator: Allocator<T, R, C>,
+    T: Scalar + ClosedAddAssign + Zero,
+    DefaultAllocator: Allocator<R, C>,
 {
     fn sum<I: Iterator<Item = OMatrix<T, R, C>>>(iter: I) -> OMatrix<T, R, C> {
         iter.fold(Matrix::zero(), |acc, x| acc + x)
@@ -376,8 +378,8 @@ where
 
 impl<T, C: Dim> iter::Sum for OMatrix<T, Dyn, C>
 where
-    T: Scalar + ClosedAdd + Zero,
-    DefaultAllocator: Allocator<T, Dyn, C>,
+    T: Scalar + ClosedAddAssign + Zero,
+    DefaultAllocator: Allocator<Dyn, C>,
 {
     /// # Example
     /// ```
@@ -406,8 +408,8 @@ where
 
 impl<'a, T, R: DimName, C: DimName> iter::Sum<&'a OMatrix<T, R, C>> for OMatrix<T, R, C>
 where
-    T: Scalar + ClosedAdd + Zero,
-    DefaultAllocator: Allocator<T, R, C>,
+    T: Scalar + ClosedAddAssign + Zero,
+    DefaultAllocator: Allocator<R, C>,
 {
     fn sum<I: Iterator<Item = &'a OMatrix<T, R, C>>>(iter: I) -> OMatrix<T, R, C> {
         iter.fold(Matrix::zero(), |acc, x| acc + x)
@@ -416,8 +418,8 @@ where
 
 impl<'a, T, C: Dim> iter::Sum<&'a OMatrix<T, Dyn, C>> for OMatrix<T, Dyn, C>
 where
-    T: Scalar + ClosedAdd + Zero,
-    DefaultAllocator: Allocator<T, Dyn, C>,
+    T: Scalar + ClosedAddAssign + Zero,
+    DefaultAllocator: Allocator<Dyn, C>,
 {
     /// # Example
     /// ```
@@ -458,7 +460,7 @@ macro_rules! componentwise_scalarop_impl(
         impl<T, R: Dim, C: Dim, S> $Trait<T> for Matrix<T, R, C, S>
             where T: Scalar + $bound,
                   S: Storage<T, R, C>,
-                  DefaultAllocator: Allocator<T, R, C> {
+                  DefaultAllocator: Allocator<R, C> {
             type Output = OMatrix<T, R, C>;
 
             #[inline]
@@ -482,7 +484,7 @@ macro_rules! componentwise_scalarop_impl(
         impl<'a, T, R: Dim, C: Dim, S> $Trait<T> for &'a Matrix<T, R, C, S>
             where T: Scalar + $bound,
                   S: Storage<T, R, C>,
-                  DefaultAllocator: Allocator<T, R, C> {
+                  DefaultAllocator: Allocator<R, C> {
             type Output = OMatrix<T, R, C>;
 
             #[inline]
@@ -506,13 +508,13 @@ macro_rules! componentwise_scalarop_impl(
     }
 );
 
-componentwise_scalarop_impl!(Mul, mul, ClosedMul; MulAssign, mul_assign);
-componentwise_scalarop_impl!(Div, div, ClosedDiv; DivAssign, div_assign);
+componentwise_scalarop_impl!(Mul, mul, ClosedMulAssign; MulAssign, mul_assign);
+componentwise_scalarop_impl!(Div, div, ClosedDivAssign; DivAssign, div_assign);
 
 macro_rules! left_scalar_mul_impl(
     ($($T: ty),* $(,)*) => {$(
         impl<R: Dim, C: Dim, S: Storage<$T, R, C>> Mul<Matrix<$T, R, C, S>> for $T
-            where DefaultAllocator: Allocator<$T, R, C> {
+            where DefaultAllocator: Allocator<R, C> {
             type Output = OMatrix<$T, R, C>;
 
             #[inline]
@@ -534,7 +536,7 @@ macro_rules! left_scalar_mul_impl(
         }
 
         impl<'b, R: Dim, C: Dim, S: Storage<$T, R, C>> Mul<&'b Matrix<$T, R, C, S>> for $T
-            where DefaultAllocator: Allocator<$T, R, C> {
+            where DefaultAllocator: Allocator<R, C> {
             type Output = OMatrix<$T, R, C>;
 
             #[inline]
@@ -551,10 +553,10 @@ left_scalar_mul_impl!(u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f
 impl<'a, 'b, T, R1: Dim, C1: Dim, R2: Dim, C2: Dim, SA, SB> Mul<&'b Matrix<T, R2, C2, SB>>
     for &'a Matrix<T, R1, C1, SA>
 where
-    T: Scalar + Zero + One + ClosedAdd + ClosedMul,
+    T: Scalar + Zero + One + ClosedAddAssign + ClosedMulAssign,
     SA: Storage<T, R1, C1>,
     SB: Storage<T, R2, C2>,
-    DefaultAllocator: Allocator<T, R1, C2>,
+    DefaultAllocator: Allocator<R1, C2>,
     ShapeConstraint: AreMultipliable<R1, C1, R2, C2>,
 {
     type Output = OMatrix<T, R1, C2>;
@@ -573,10 +575,10 @@ where
 impl<'a, T, R1: Dim, C1: Dim, R2: Dim, C2: Dim, SA, SB> Mul<Matrix<T, R2, C2, SB>>
     for &'a Matrix<T, R1, C1, SA>
 where
-    T: Scalar + Zero + One + ClosedAdd + ClosedMul,
+    T: Scalar + Zero + One + ClosedAddAssign + ClosedMulAssign,
     SB: Storage<T, R2, C2>,
     SA: Storage<T, R1, C1>,
-    DefaultAllocator: Allocator<T, R1, C2>,
+    DefaultAllocator: Allocator<R1, C2>,
     ShapeConstraint: AreMultipliable<R1, C1, R2, C2>,
 {
     type Output = OMatrix<T, R1, C2>;
@@ -590,10 +592,10 @@ where
 impl<'b, T, R1: Dim, C1: Dim, R2: Dim, C2: Dim, SA, SB> Mul<&'b Matrix<T, R2, C2, SB>>
     for Matrix<T, R1, C1, SA>
 where
-    T: Scalar + Zero + One + ClosedAdd + ClosedMul,
+    T: Scalar + Zero + One + ClosedAddAssign + ClosedMulAssign,
     SB: Storage<T, R2, C2>,
     SA: Storage<T, R1, C1>,
-    DefaultAllocator: Allocator<T, R1, C2>,
+    DefaultAllocator: Allocator<R1, C2>,
     ShapeConstraint: AreMultipliable<R1, C1, R2, C2>,
 {
     type Output = OMatrix<T, R1, C2>;
@@ -607,10 +609,10 @@ where
 impl<T, R1: Dim, C1: Dim, R2: Dim, C2: Dim, SA, SB> Mul<Matrix<T, R2, C2, SB>>
     for Matrix<T, R1, C1, SA>
 where
-    T: Scalar + Zero + One + ClosedAdd + ClosedMul,
+    T: Scalar + Zero + One + ClosedAddAssign + ClosedMulAssign,
     SB: Storage<T, R2, C2>,
     SA: Storage<T, R1, C1>,
-    DefaultAllocator: Allocator<T, R1, C2>,
+    DefaultAllocator: Allocator<R1, C2>,
     ShapeConstraint: AreMultipliable<R1, C1, R2, C2>,
 {
     type Output = OMatrix<T, R1, C2>;
@@ -629,11 +631,11 @@ where
     R1: Dim,
     C1: Dim,
     R2: Dim,
-    T: Scalar + Zero + One + ClosedAdd + ClosedMul,
+    T: Scalar + Zero + One + ClosedAddAssign + ClosedMulAssign,
     SB: Storage<T, R2, C1>,
     SA: StorageMut<T, R1, C1> + IsContiguous + Clone, // TODO: get rid of the IsContiguous
     ShapeConstraint: AreMultipliable<R1, C1, R2, C1>,
-    DefaultAllocator: Allocator<T, R1, C1, Buffer = SA>,
+    DefaultAllocator: Allocator<R1, C1, Buffer<T> = SA>,
 {
     #[inline]
     fn mul_assign(&mut self, rhs: Matrix<T, R2, C1, SB>) {
@@ -646,12 +648,12 @@ where
     R1: Dim,
     C1: Dim,
     R2: Dim,
-    T: Scalar + Zero + One + ClosedAdd + ClosedMul,
+    T: Scalar + Zero + One + ClosedAddAssign + ClosedMulAssign,
     SB: Storage<T, R2, C1>,
     SA: StorageMut<T, R1, C1> + IsContiguous + Clone, // TODO: get rid of the IsContiguous
     ShapeConstraint: AreMultipliable<R1, C1, R2, C1>,
     // TODO: this is too restrictive. See comments for the non-ref version.
-    DefaultAllocator: Allocator<T, R1, C1, Buffer = SA>,
+    DefaultAllocator: Allocator<R1, C1, Buffer<T> = SA>,
 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'b Matrix<T, R2, C1, SB>) {
@@ -662,7 +664,7 @@ where
 /// # Special multiplications.
 impl<T, R1: Dim, C1: Dim, SA> Matrix<T, R1, C1, SA>
 where
-    T: Scalar + Zero + One + ClosedAdd + ClosedMul,
+    T: Scalar + Zero + One + ClosedAddAssign + ClosedMulAssign,
     SA: Storage<T, R1, C1>,
 {
     /// Equivalent to `self.transpose() * rhs`.
@@ -671,7 +673,7 @@ where
     pub fn tr_mul<R2: Dim, C2: Dim, SB>(&self, rhs: &Matrix<T, R2, C2, SB>) -> OMatrix<T, C1, C2>
     where
         SB: Storage<T, R2, C2>,
-        DefaultAllocator: Allocator<T, C1, C2>,
+        DefaultAllocator: Allocator<C1, C2>,
         ShapeConstraint: SameNumberOfRows<R1, R2>,
     {
         let mut res = Matrix::uninit(self.shape_generic().1, rhs.shape_generic().1);
@@ -687,7 +689,7 @@ where
     where
         T: SimdComplexField,
         SB: Storage<T, R2, C2>,
-        DefaultAllocator: Allocator<T, C1, C2>,
+        DefaultAllocator: Allocator<C1, C2>,
         ShapeConstraint: SameNumberOfRows<R1, R2>,
     {
         let mut res = Matrix::uninit(self.shape_generic().1, rhs.shape_generic().1);
@@ -799,11 +801,11 @@ where
         rhs: &Matrix<T, R2, C2, SB>,
     ) -> OMatrix<T, DimProd<R1, R2>, DimProd<C1, C2>>
     where
-        T: ClosedMul,
+        T: ClosedMulAssign,
         R1: DimMul<R2>,
         C1: DimMul<C2>,
         SB: Storage<T, R2, C2>,
-        DefaultAllocator: Allocator<T, DimProd<R1, R2>, DimProd<C1, C2>>,
+        DefaultAllocator: Allocator<DimProd<R1, R2>, DimProd<C1, C2>>,
     {
         let (nrows1, ncols1) = self.shape_generic();
         let (nrows2, ncols2) = rhs.shape_generic();
@@ -835,8 +837,8 @@ where
 
 impl<T, D: DimName> iter::Product for OMatrix<T, D, D>
 where
-    T: Scalar + Zero + One + ClosedMul + ClosedAdd,
-    DefaultAllocator: Allocator<T, D, D>,
+    T: Scalar + Zero + One + ClosedMulAssign + ClosedAddAssign,
+    DefaultAllocator: Allocator<D, D>,
 {
     fn product<I: Iterator<Item = OMatrix<T, D, D>>>(iter: I) -> OMatrix<T, D, D> {
         iter.fold(Matrix::one(), |acc, x| acc * x)
@@ -845,8 +847,8 @@ where
 
 impl<'a, T, D: DimName> iter::Product<&'a OMatrix<T, D, D>> for OMatrix<T, D, D>
 where
-    T: Scalar + Zero + One + ClosedMul + ClosedAdd,
-    DefaultAllocator: Allocator<T, D, D>,
+    T: Scalar + Zero + One + ClosedMulAssign + ClosedAddAssign,
+    DefaultAllocator: Allocator<D, D>,
 {
     fn product<I: Iterator<Item = &'a OMatrix<T, D, D>>>(iter: I) -> OMatrix<T, D, D> {
         iter.fold(Matrix::one(), |acc, x| acc * x)

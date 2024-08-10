@@ -54,19 +54,18 @@ use rkyv::bytecheck;
 ///
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[cfg_attr(feature = "cuda", derive(cust_core::DeviceCopy))]
 #[cfg_attr(feature = "serde-serialize-no-std", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "serde-serialize-no-std",
     serde(bound(serialize = "R: Serialize,
-                     DefaultAllocator: Allocator<T, Const<D>>,
+                     DefaultAllocator: Allocator<Const<D>>,
                      Owned<T, Const<D>>: Serialize,
                      T: Scalar"))
 )]
 #[cfg_attr(
     feature = "serde-serialize-no-std",
     serde(bound(deserialize = "R: Deserialize<'de>,
-                       DefaultAllocator: Allocator<T, Const<D>>,
+                       DefaultAllocator: Allocator<Const<D>>,
                        Owned<T, Const<D>>: Deserialize<'de>,
                        T: Scalar"))
 )]
@@ -434,7 +433,7 @@ impl<T: SimdRealField, R, const D: usize> Isometry<T, R, D> {
     where
         Const<D>: DimNameAdd<U1>,
         R: SubsetOf<OMatrix<T, DimNameSum<Const<D>, U1>, DimNameSum<Const<D>, U1>>>,
-        DefaultAllocator: Allocator<T, DimNameSum<Const<D>, U1>, DimNameSum<Const<D>, U1>>,
+        DefaultAllocator: Allocator<DimNameSum<Const<D>, U1>, DimNameSum<Const<D>, U1>>,
     {
         let mut res: OMatrix<T, _, _> = crate::convert_ref(&self.rotation);
         res.fixed_view_mut::<D, 1>(0, D)
@@ -466,7 +465,7 @@ impl<T: SimdRealField, R, const D: usize> Isometry<T, R, D> {
     where
         Const<D>: DimNameAdd<U1>,
         R: SubsetOf<OMatrix<T, DimNameSum<Const<D>, U1>, DimNameSum<Const<D>, U1>>>,
-        DefaultAllocator: Allocator<T, DimNameSum<Const<D>, U1>, DimNameSum<Const<D>, U1>>,
+        DefaultAllocator: Allocator<DimNameSum<Const<D>, U1>, DimNameSum<Const<D>, U1>>,
     {
         self.to_homogeneous()
     }

@@ -155,7 +155,7 @@ pub use crate::sparse::*;
 pub use base as core;
 
 #[cfg(feature = "macros")]
-pub use nalgebra_macros::{dmatrix, dvector, matrix, point, vector};
+pub use nalgebra_macros::{dmatrix, dvector, matrix, point, stack, vector};
 
 use simba::scalar::SupersetOf;
 use std::cmp::{self, Ordering, PartialOrd};
@@ -165,7 +165,8 @@ use num::{One, Signed, Zero};
 use base::allocator::Allocator;
 pub use num_complex::Complex;
 pub use simba::scalar::{
-    ClosedAdd, ClosedDiv, ClosedMul, ClosedSub, ComplexField, Field, RealField,
+    ClosedAddAssign, ClosedDivAssign, ClosedMulAssign, ClosedSubAssign, ComplexField, Field,
+    RealField,
 };
 pub use simba::simd::{SimdBool, SimdComplexField, SimdPartialOrd, SimdRealField, SimdValue};
 
@@ -206,7 +207,7 @@ pub fn zero<T: Zero>() -> T {
 #[inline]
 pub fn wrap<T>(mut val: T, min: T, max: T) -> T
 where
-    T: Copy + PartialOrd + ClosedAdd + ClosedSub,
+    T: Copy + PartialOrd + ClosedAddAssign + ClosedSubAssign,
 {
     assert!(min < max, "Invalid wrapping bounds.");
     let width = max - min;
@@ -275,7 +276,7 @@ pub fn abs<T: Signed>(a: &T) -> T {
 pub fn inf<T, R: Dim, C: Dim>(a: &OMatrix<T, R, C>, b: &OMatrix<T, R, C>) -> OMatrix<T, R, C>
 where
     T: Scalar + SimdPartialOrd,
-    DefaultAllocator: Allocator<T, R, C>,
+    DefaultAllocator: Allocator<R, C>,
 {
     a.inf(b)
 }
@@ -286,7 +287,7 @@ where
 pub fn sup<T, R: Dim, C: Dim>(a: &OMatrix<T, R, C>, b: &OMatrix<T, R, C>) -> OMatrix<T, R, C>
 where
     T: Scalar + SimdPartialOrd,
-    DefaultAllocator: Allocator<T, R, C>,
+    DefaultAllocator: Allocator<R, C>,
 {
     a.sup(b)
 }
@@ -300,7 +301,7 @@ pub fn inf_sup<T, R: Dim, C: Dim>(
 ) -> (OMatrix<T, R, C>, OMatrix<T, R, C>)
 where
     T: Scalar + SimdPartialOrd,
-    DefaultAllocator: Allocator<T, R, C>,
+    DefaultAllocator: Allocator<R, C>,
 {
     a.inf_sup(b)
 }

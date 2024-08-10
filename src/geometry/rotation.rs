@@ -64,7 +64,6 @@ use rkyv::bytecheck;
     )
 )]
 #[cfg_attr(feature = "rkyv-serialize", derive(bytecheck::CheckBytes))]
-#[cfg_attr(feature = "cuda", derive(cust_core::DeviceCopy))]
 #[derive(Copy, Clone)]
 pub struct Rotation<T, const D: usize> {
     matrix: SMatrix<T, D, D>,
@@ -78,7 +77,7 @@ impl<T: fmt::Debug, const D: usize> fmt::Debug for Rotation<T, D> {
 
 impl<T: Scalar + hash::Hash, const D: usize> hash::Hash for Rotation<T, D>
 where
-    <DefaultAllocator as Allocator<T, Const<D>, Const<D>>>::Buffer: hash::Hash,
+    <DefaultAllocator as Allocator<Const<D>, Const<D>>>::Buffer<T>: hash::Hash,
 {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.matrix.hash(state)
@@ -185,6 +184,10 @@ impl<T: Scalar, const D: usize> Rotation<T, D> {
     }
 
     /// A mutable reference to the underlying matrix representation of this rotation.
+    ///
+    /// # Safety
+    ///
+    /// Invariants of the rotation matrix should not be violated.
     #[inline]
     #[deprecated(note = "Use `.matrix_mut_unchecked()` instead.")]
     pub unsafe fn matrix_mut(&mut self) -> &mut SMatrix<T, D, D> {
@@ -262,7 +265,7 @@ impl<T: Scalar, const D: usize> Rotation<T, D> {
     where
         T: Zero + One,
         Const<D>: DimNameAdd<U1>,
-        DefaultAllocator: Allocator<T, DimNameSum<Const<D>, U1>, DimNameSum<Const<D>, U1>>,
+        DefaultAllocator: Allocator<DimNameSum<Const<D>, U1>, DimNameSum<Const<D>, U1>>,
     {
         // We could use `SMatrix::to_homogeneous()` here, but that would imply
         // adding the additional traits `DimAdd` and `IsNotStaticOne`. Maybe
@@ -278,7 +281,7 @@ impl<T: Scalar, const D: usize> Rotation<T, D> {
 impl<T: Scalar, const D: usize> Rotation<T, D> {
     /// Transposes `self`.
     ///
-    /// Same as `.inverse()` because the inverse of a rotation matrix is its transform.
+    /// Same as `.inverse()` because the inverse of a rotation matrix is its transpose.
     ///
     /// # Example
     /// ```
@@ -302,7 +305,7 @@ impl<T: Scalar, const D: usize> Rotation<T, D> {
 
     /// Inverts `self`.
     ///
-    /// Same as `.transpose()` because the inverse of a rotation matrix is its transform.
+    /// Same as `.transpose()` because the inverse of a rotation matrix is its transpose.
     ///
     /// # Example
     /// ```
@@ -326,7 +329,7 @@ impl<T: Scalar, const D: usize> Rotation<T, D> {
 
     /// Transposes `self` in-place.
     ///
-    /// Same as `.inverse_mut()` because the inverse of a rotation matrix is its transform.
+    /// Same as `.inverse_mut()` because the inverse of a rotation matrix is its transpose.
     ///
     /// # Example
     /// ```
@@ -353,7 +356,7 @@ impl<T: Scalar, const D: usize> Rotation<T, D> {
 
     /// Inverts `self` in-place.
     ///
-    /// Same as `.transpose_mut()` because the inverse of a rotation matrix is its transform.
+    /// Same as `.transpose_mut()` because the inverse of a rotation matrix is its transpose.
     ///
     /// # Example
     /// ```
